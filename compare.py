@@ -7,6 +7,9 @@ SL_path="/eos/user/j/jwsmith/ttgamma/plottingPipeline/v010/11_04_2018/singlelept
 DL_path="/eos/user/j/jwsmith/ttgamma/plottingPipeline/v010/11_04_2018/dilepton_fullFit_merged_C_Off/build/SR1_ee_mumu_emu_merged/ee_mumu_emu_merged/Histograms/"
 DL_path_stat_only="/eos/user/j/jwsmith/ttgamma/plottingPipeline/v010/11_04_2018/dilepton_fullFit_merged_C_Off_StatOnly/build/SR1_ee_mumu_emu_merged/ee_mumu_emu_merged/Histograms/"
 
+HS=3244
+alpha=0.3
+
 def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   prefit=ROOT.TFile(ntuplePath+prefitNtuple,"r")
   postfit=ROOT.TFile(ntuplePath+variable+"_postFit.root","r")
@@ -43,8 +46,7 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
     zphoton = prefit.Get(variable+"_Zphoton")
     hfake.Add(zphoton)
 
-  hfake.SetFillColor(ROOT.kGreen+1);
-  hfake.SetFillStyle(3351)
+  hfake.SetFillStyle(0)
   hfake.SetLineWidth(3)
   hfake.SetLineColor(ROOT.kGreen+1)
   hfake.SetMarkerStyle(0)
@@ -56,15 +58,22 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   #
   xaxis.SetTitle(xvar)
   xaxis.SetLabelSize(0)
-  yaxis.SetTitle("Events")
+  yaxis.SetTitle("A.U.")
   yaxis.SetTitleOffset(1.7)
 
+  hfake.Sumw2()
+  hfake.Scale(1/hfake.Integral())
   Max=hfake.GetMaximum()
   if channel=="SL":
-    hfake.SetMaximum(Max+220)
+    hfake.SetMaximum(Max+0.03)
   else:
-    hfake.SetMaximum(Max+5)
-  hfake.Draw("H")
+    hfake.SetMaximum(Max+0.3)
+  hfake.DrawCopy("hist ")
+  hfake.SetFillColorAlpha(ROOT.kGreen+1,alpha)
+  hfake.SetFillStyle(HS)
+  hfake.Draw("e2same ")
+
+
 
   ####### Now get post-fit
   hfake_post = postfit.Get("h_hadronfakes_postFit")
@@ -80,12 +89,16 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   if channel=="DL":
     zphoton_post = postfit.Get("h_Zphoton_postFit")
     hfake_post.Add(zphoton_post)
-  hfake_post.SetFillColor(ROOT.kBlue);
-  hfake_post.SetFillStyle(3315)
   hfake_post.SetMarkerStyle(0)
   hfake_post.SetLineWidth(3)
+  hfake_post.SetFillStyle(0)
   hfake_post.SetLineColor(ROOT.kBlue)
-  hfake_post.Draw("H same")
+  hfake_post.Sumw2()
+  hfake_post.Scale(1/hfake_post.Integral())
+  hfake_post.DrawCopy("hist same ")
+  hfake_post.SetFillColorAlpha(ROOT.kBlue,alpha)
+  hfake_post.SetFillStyle(HS)
+  hfake_post.Draw("e2same ")
 
   # Stat only SL
   hfake_post_stat_only = postfit_stat_only.Get("h_hadronfakes_postFit")
@@ -103,12 +116,18 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
     hfake_post_stat_only.Add(zphoton_post_stat_only)
 
   hfake_post_stat_only.SetFillColor(ROOT.kRed);
-  hfake_post_stat_only.SetFillStyle(3395)
+  #hfake_post_stat_only.SetFillStyle(3395)
+  hfake_post_stat_only.SetFillStyle(0)
   hfake_post_stat_only.SetMarkerStyle(0)
   hfake_post_stat_only.SetLineWidth(3)
   hfake_post_stat_only.SetLineColor(ROOT.kRed)
   if channel=="SL":
-    hfake_post_stat_only.Draw("H same")
+    hfake_post_stat_only.Sumw2()
+    hfake_post_stat_only.Scale(1/hfake_post_stat_only.Integral())
+    hfake_post_stat_only.DrawCopy("hist same ")
+    hfake_post_stat_only.SetFillColorAlpha(ROOT.kRed,alpha)
+    hfake_post_stat_only.SetFillStyle(HS)
+    hfake_post_stat_only.Draw("e2same ")
 
   lumi = ROOT.TLatex();
   lumi.SetNDC();
@@ -127,6 +146,11 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   if channel=="SL":
     leg.AddEntry(hfake_post_stat_only,"Post-fit background, StatOnly","l");
   leg.AddEntry(hfake_post,"Post-fit background","l");
+
+  uncert_legend=hfake.Clone("legend")
+  uncert_legend.SetFillColor(1)
+  uncert_legend.SetLineColor(0)
+  leg.AddEntry(uncert_legend,"Stat error (I think)","f")
   leg.SetBorderSize(0)
   leg.SetFillStyle(0)
   leg.Draw()
@@ -134,10 +158,11 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
 
    #Ratio plot
   pad2.cd()
-  ratio1 = hfake.Clone("ratio")
+  ratio1 = hfake_post.Clone("ratio")
+  ratio1.SetFillStyle(0)
   if channel=="SL":
-    ratio1.SetMinimum(0.8)
-    ratio1.SetMaximum(1.5)
+    ratio1.SetMinimum(0.6)
+    ratio1.SetMaximum(1.4)
   else:
     ratio1.SetMinimum(0)
     ratio1.SetMaximum(2)
@@ -146,7 +171,7 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   ratio1.Divide(hfake_post)
   ratio1.SetTitle("")
   y = ratio1.GetYaxis()
-  y.SetTitle("#frac{Pre-fit}{Post-fit}")
+  y.SetTitle("#frac{Post-fit}{Pre-fit}")
   y.SetNdivisions(505)
   y.CenterTitle()
   y.SetTitleOffset(1.7)
@@ -155,19 +180,36 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   x.SetTitleOffset(3.2)
   x.SetLabelSize(21)
   ratio1.SetLineColor(ROOT.kBlue)
-  ratio1.Draw()
+  ratio1.DrawCopy("hist ")
+  ratio1.SetFillColorAlpha(ROOT.kBlue,alpha);
+  ratio1.SetFillStyle(HS)
+  ratio1.Draw("e2same ")
 
   if channel=="SL":
-    ratio2 = hfake.Clone("ratio_2")
+    ratio2 = hfake_post.Clone("ratio_2")
     ratio2.Divide(hfake_post_stat_only)
     ratio2.SetLineColor(ROOT.kRed)
-    ratio2.Draw("same")
+    ratio2.SetFillStyle(0)
+    ratio2.DrawCopy("hist same ")
+    ratio2.SetFillColorAlpha(ROOT.kRed,alpha)
+    ratio2.SetFillStyle(HS)
+    ratio2.Draw("e2same ")
+
+
+  ratio3 = hfake_post.Clone("ratio_3")
+  ratio3.Divide(hfake)
+  ratio3.SetLineColor(ROOT.kGreen+1)
+  ratio3.SetFillStyle(0)
+  ratio3.DrawCopy("hist same ")
+  ratio3.SetFillColorAlpha(ROOT.kGreen+1,alpha)
+  ratio3.SetFillStyle(HS)
+  ratio3.Draw("e2same ")
 
   line = ROOT.TF1("Sig_fa1","1",-1000,1000);
   line.Draw("same")
-  line.SetLineColor(ROOT.kGreen+1);
+  line.SetLineColor(ROOT.kBlue);
 
-  c1.SaveAs(variable+"_backgrounds.eps")
+  c1.SaveAs(variable+"_backgrounds.pdf")
 
 
 
