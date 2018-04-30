@@ -1,3 +1,11 @@
+"""
+This compares (stat+syst) backgrounds for three scenarios:
+1) Stat only post-fit
+2) Full post-fit
+3) Prefit
+"""
+
+
 import ROOT
 from ROOT import gROOT
 gROOT.SetBatch(True)
@@ -150,7 +158,7 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   uncert_legend=hfake.Clone("legend")
   uncert_legend.SetFillColor(1)
   uncert_legend.SetLineColor(0)
-  leg.AddEntry(uncert_legend,"Stat error (I think)","f")
+  leg.AddEntry(uncert_legend,"Total background error","f")
   leg.SetBorderSize(0)
   leg.SetFillStyle(0)
   leg.Draw()
@@ -161,8 +169,8 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   ratio1 = hfake_post.Clone("ratio")
   ratio1.SetFillStyle(0)
   if channel=="SL":
-    ratio1.SetMinimum(0.6)
-    ratio1.SetMaximum(1.4)
+    ratio1.SetMinimum(0.5)
+    ratio1.SetMaximum(1.5)
   else:
     ratio1.SetMinimum(0)
     ratio1.SetMaximum(2)
@@ -193,7 +201,7 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
     ratio2.DrawCopy("hist same ")
     ratio2.SetFillColorAlpha(ROOT.kRed,alpha)
     ratio2.SetFillStyle(HS)
-    ratio2.Draw("e2same ")
+    #ratio2.Draw("e2same ")
 
 
   ratio3 = hfake_post.Clone("ratio_3")
@@ -203,7 +211,7 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   ratio3.DrawCopy("hist same ")
   ratio3.SetFillColorAlpha(ROOT.kGreen+1,alpha)
   ratio3.SetFillStyle(HS)
-  ratio3.Draw("e2same ")
+  #ratio3.Draw("e2same ")
 
   line = ROOT.TF1("Sig_fa1","1",-1000,1000);
   line.Draw("same")
