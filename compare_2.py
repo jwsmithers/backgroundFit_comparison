@@ -15,7 +15,7 @@ SL_Asimov_path="/eos/user/j/jwsmith/ttgamma/plottingPipeline/v010/11_04_2018/sin
 DL_Asimov_path="/eos/user/j/jwsmith/ttgamma/plottingPipeline/v010/11_04_2018/dilepton_Asimov_merged_C_On/build/SR1_ee_mumu_emu_merged/ee_mumu_emu_merged/Histograms/"
 
 alpha=0.9
-
+normed=True
 def drawPostPlot(postfit,process,channel, xvar,colour,manual_error=False):
   colour=ROOT.kBlack
   if process=="background":
@@ -33,71 +33,81 @@ def drawPostPlot(postfit,process,channel, xvar,colour,manual_error=False):
     if channel=="DL":
       zphoton_post = postfit.Get("h_Zphoton_postFit")
       histo.Add(zphoton_post)
-    #############Common
-    histo.SetTitle("")
-    xaxis=histo.GetXaxis()
-    yaxis=histo.GetYaxis()
-    xaxis.SetTitle(xvar)
-    xaxis.SetLabelSize(0)
-    yaxis.SetTitle("A.U.")
-    yaxis.SetTitleOffset(1.7)
-    ###################
-    histo.SetMarkerStyle(0)
-    histo.SetLineWidth(3)
-    histo.SetFillStyle(0)
-    histo.SetLineColor(colour)
-    histo.Sumw2()
-    #histo.Scale(1/histo.Integral())
-  return histo
+  if process=="signal":
+    histo = postfit.Get("h_ttphoton_postFit")   
+  #############Common
+  histo.SetTitle("")
+  xaxis=histo.GetXaxis()
+  yaxis=histo.GetYaxis()
+  xaxis.SetTitle(xvar)
+  xaxis.SetLabelSize(0)
+  yaxis.SetTitle("A.U.")
+  yaxis.SetTitleOffset(1.7)
+  ###################
+  histo.SetMarkerStyle(0)
+  histo.SetLineWidth(3)
+  histo.SetFillStyle(0)
+  histo.SetLineColor(colour)
+  histo.Sumw2()
+  normalisation_factor=histo.Integral()
+  if normed:
+    histo.Scale(1/normalisation_factor)
+  return histo,normalisation_factor
 
-def getSystematicError(f,binN,channel):
+def getSystematicError(f,binN,channel,process,variable,total_norm):
   histograms= []
-  f.cd()
   errors = []
+
   for h in f.GetListOfKeys():
-    h = h.ReadObj()
     histograms.append(h.GetName())
 
-  if channel=="SL":
-    samples = ["hadronfakes","electronfakes","Wphoton","QCD","Other"]
+  if process=="signal":
+     samples = ["h_ttphoton"]
+  elif channel=="SL":
+    samples = ["h_hadronfakes","h_electronfakes","h_Wphoton","h_QCD","h_Other"]
   elif channel=="DL":
-    samples = ["hadronfakes","electronfakes","Zphoton","Other"]
+    samples = ["h_hadronfakes","h_electronfakes","h_Zphoton","h_Other"]
   for s in samples:
-    nominal_original=f.Get("h_"+s+"_postFit")
-    nominal=nominal_original.Clone("nominal")
-    nominal_original.Sumw2()
-    nominal.Sumw2()
+    print "Working on: ", s
     for hist in histograms:
       if s not in hist: continue
-      if hist == "h_"+s+"_postFit":continue
+      if "Down_postFit" in hist: continue
+      if "WphotonSF_Up" in hist:continue
       if "SigXsecOverSM" in hist: continue
-      if "Down" in hist: continue
+      postFit_original=f.Get(s+"_postFit")
+      postFit=postFit_original.Clone("postFit_original")
+      postFit_original.Sumw2()
+      postFit.Sumw2()
+      if hist == s+"_postFit": continue
       if s not in hist: continue
-      if "event_ELD_MVA_ejets_ttphoton" in hist:continue
       if "h_tot" in hist: continue
+
+
       error=0
       up=f.Get(hist)
       if up.Integral() == 0: continue
-      if up.Integral()==nominal.Integral(): continue
-      #down=f.Get(hist)
+      if up.Integral() == postFit_original.Integral(): continue 
       nbins=up.GetSize()
       up.Sumw2()
-      #down.Sumw2()
 
-      #nominal.Scale(1/nominal_original.Integral())
-      #up.Scale(1/nominal_original.Integral())
+      if normed:
+        postFit.Scale(1/total_norm)
+        up.Scale(1/total_norm)
 
-      error = up.GetBinError(binN)
-      print hist, " = ", error
+      #error = up.GetBinError(binN) #Sanity check
+      error = up.GetBinContent(binN)-postFit.GetBinContent(binN)
+      print s+"_postFit:", binN, " " ,hist, " error = ", error
       errors.append(error)
-  groomed_errors=list(set(errors))
+  # if doing sanity check, only need 1 of the numbers so take a set
+  #groomed_errors=list(set(errors)) #sanity check
+  groomed_errors=errors
   total_error_list = map(lambda x: x**2,groomed_errors)
   total_error =  math.sqrt(sum(total_error_list))
-  print total_error
   return total_error
 
 def plot(channel,ntuplePath,variable,xvar,process):
   postfit=ROOT.TFile(ntuplePath+variable+"_postFit.root","r")
+  print "Opened ", ntuplePath+variable+"_postFit.root"
   c1 = ROOT.TCanvas("canvas","",0,0,800,800);
   c1.SetFillColor(0);
   # Upper histogram plot is pad1
@@ -112,26 +122,34 @@ def plot(channel,ntuplePath,variable,xvar,process):
   pad2.Draw()
   pad1.cd()
 
-  histo_correlated = drawPostPlot(postfit,process,channel,variable,ROOT.kBlue)
+  _histo_correlated = drawPostPlot(postfit,process,channel,variable,ROOT.kBlue)
+  histo_correlated = _histo_correlated[0]
   Max=histo_correlated.GetMaximum()
   if channel=="SL":
-    histo_correlated.SetMaximum(Max+0.04) # If normalized
-    #histo_correlated.SetMaximum(Max+120)
+    if normed:
+      histo_correlated.SetMaximum(Max+0.04) # If normalized
+    else:
+      histo_correlated.SetMaximum(Max+120)
   else:
-    histo_correlated.SetMaximum(Max+0.3)
+    if normed:
+      histo_correlated.SetMaximum(Max+0.05)
+    else:
+      histo_correlated.SetMaximum(Max+20)
   histo_correlated.DrawCopy("hist")
   histo_correlated.SetFillColorAlpha(ROOT.kBlue,alpha)
   histo_correlated.SetFillStyle(3353)
   histo_correlated.Draw("e2same ")
 
   # For adding systematics manually:
-  histo_uncorrelated = drawPostPlot(postfit,process,channel,variable,ROOT.kRed,manual_error=True)
+  _histo_uncorrelated = drawPostPlot(postfit,process,channel,variable,ROOT.kRed,manual_error=True)
+  histo_uncorrelated = _histo_uncorrelated[0] 
+  norm_factor = _histo_uncorrelated[1] 
   histo_uncorrelated.DrawCopy("hist same")
   histo_uncorrelated.SetFillColorAlpha(ROOT.kRed,alpha)
   histo_uncorrelated.SetFillStyle(3335)
   histo_uncorrelated.Draw("e2same ")
   for b in range(1,histo_uncorrelated.GetSize()-1):
-    totalBinError = getSystematicError(postfit,b,channel)
+    totalBinError = getSystematicError(postfit,b,channel,process,variable,norm_factor)
     histo_uncorrelated.SetBinError(b,0)
     histo_uncorrelated.SetBinError(b,totalBinError)
 
@@ -150,7 +168,7 @@ def plot(channel,ntuplePath,variable,xvar,process):
   leg.SetTextSize(0.03);
   total=histo_correlated.Clone("total")
   total.SetLineColor(ROOT.kBlack)
-  leg.AddEntry(total,"Total background","l");
+  leg.AddEntry(total,"Total "+process,"l");
 
   uncert_cor=histo_correlated.Clone("legend")
   uncert_cor.SetFillColor(ROOT.kBlue)
@@ -158,9 +176,8 @@ def plot(channel,ntuplePath,variable,xvar,process):
   uncert_uncor=histo_uncorrelated.Clone("legend2")
   uncert_uncor.SetFillColor(ROOT.kRed)
   uncert_uncor.SetLineColor(0)
-
-  leg.AddEntry(uncert_cor,"Correlated background","f")
-  leg.AddEntry(uncert_uncor,"Uncorrelated background","f")
+  leg.AddEntry(uncert_cor,"Correlated "+process+" uncertainties","f")
+  leg.AddEntry(uncert_uncor,"Uncorrelated "+process+ " uncertaintes","f")
   leg.SetBorderSize(0)
   leg.SetFillStyle(0)
   leg.Draw()
@@ -170,18 +187,12 @@ def plot(channel,ntuplePath,variable,xvar,process):
   pad2.cd()
   ratio1 = histo_correlated.Clone("ratio")
   ratio1.SetFillStyle(0)
-  if channel=="SL":
-    ratio1.SetMinimum(0)
-    ratio1.SetMaximum(2)
-  else:
-    ratio1.SetMinimum(0)
-    ratio1.SetMaximum(2)
   ratio1.Sumw2()
   ratio1.SetStats(0)
   ratio1.Divide(histo_correlated)
   ratio1.SetTitle("")
   y = ratio1.GetYaxis()
-  y.SetTitle("#frac{Uncorr.}{Corr.}")
+  y.SetTitle("#frac{Uncorr. uncert.}{Corr. uncert.}")
   y.SetNdivisions(505)
   y.CenterTitle()
   y.SetTitleOffset(1.7)
@@ -198,9 +209,13 @@ def plot(channel,ntuplePath,variable,xvar,process):
   for b in range(1,nbins-1):
     error_corr=histo_correlated.GetBinError(b)
     error_uncorr=histo_uncorrelated.GetBinError(b)
-    #error = (error_uncorr-error_corr)/(error_corr)
     error = (error_uncorr)/(error_corr)
+    ratio1.SetBinContent(b,0)
     ratio1.SetBinContent(b,error)
+  _max=ratio1.GetBinContent(ratio1.GetMaximumBin())
+  _min=ratio1.GetMinimum()
+  ratio1.SetMinimum(_min-0.5)
+  ratio1.SetMaximum(_max+0.5)
   ratio1.Draw("same hist ")
 
   line = ROOT.TF1("Sig_fa1","1",-1000,1000);
@@ -208,19 +223,31 @@ def plot(channel,ntuplePath,variable,xvar,process):
   line.SetLineColor(ROOT.kBlack);
   line.SetLineStyle(2);
 
-  c1.SaveAs(variable+"_uncert_comparison.pdf")
+  c1.SaveAs(variable+"_uncert_comparison_"+process+".pdf")
 
 
 
 plot("SL",SL_Asimov_path, "event_ELD_MVA_ejets","event level descriminator", "background")
-#plot("SL",SL_Asimov_path, "ph_pt_ejets","p_{T}(#gamma)", "background")
-#plot("SL",SL_Asimov_path, "ph_eta_ejets","#eta(#gamma)","background")
-#plot("SL",SL_Asimov_path, "dR_lept_ejets","#DeltaR(#gamma,l)","background")
+plot("SL",SL_Asimov_path, "ph_pt_ejets","p_{T}(#gamma)", "background")
+plot("SL",SL_Asimov_path, "ph_eta_ejets","#eta(#gamma)","background")
+plot("SL",SL_Asimov_path, "dR_lept_ejets","#DeltaR(#gamma,l)","background")
+
+plot("SL",SL_Asimov_path, "event_ELD_MVA_ejets","event level descriminator", "signal")
+plot("SL",SL_Asimov_path, "ph_pt_ejets","p_{T}(#gamma)", "signal")
+plot("SL",SL_Asimov_path, "ph_eta_ejets","#eta(#gamma)","signal")
+plot("SL",SL_Asimov_path, "dR_lept_ejets","#DeltaR(#gamma,l)","signal")
 
 plot("DL",DL_Asimov_path, "dEta_lep_ee","#Delta#eta(l,l)","background")
-#plot("DL",DL_Asimov_path, "dPhi_lep_ee","#Delta#phi(l,l)","background")
-#plot("DL",DL_Asimov_path, "dR_lept_ee","#DeltaR(#gamma,l)","background")
-#plot("DL",DL_Asimov_path, "event_ELD_MVA_ee","event level descriminator","background")
-#plot("DL",DL_Asimov_path, "ph_pt_ee","p_{T}(#gamma)","background")
-#plot("DL",DL_Asimov_path, "ph_eta_ee","#eta(#gamma)","background")
+plot("DL",DL_Asimov_path, "dPhi_lep_ee","#Delta#phi(l,l)","background")
+plot("DL",DL_Asimov_path, "dR_lept_ee","#DeltaR(#gamma,l)","background")
+plot("DL",DL_Asimov_path, "event_ELD_MVA_ee","event level descriminator","background")
+plot("DL",DL_Asimov_path, "ph_pt_ee","p_{T}(#gamma)","background")
+plot("DL",DL_Asimov_path, "ph_eta_ee","#eta(#gamma)","background")
+
+plot("DL",DL_Asimov_path, "dEta_lep_ee","#Delta#eta(l,l)","signal")
+plot("DL",DL_Asimov_path, "dPhi_lep_ee","#Delta#phi(l,l)","signal")
+plot("DL",DL_Asimov_path, "dR_lept_ee","#DeltaR(#gamma,l)","signal")
+plot("DL",DL_Asimov_path, "event_ELD_MVA_ee","event level descriminator","signal")
+plot("DL",DL_Asimov_path, "ph_pt_ee","p_{T}(#gamma)","signal")
+plot("DL",DL_Asimov_path, "ph_eta_ee","#eta(#gamma)","signal")
 
