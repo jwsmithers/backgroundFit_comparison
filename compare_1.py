@@ -148,17 +148,23 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
     lumi.DrawLatex(0.4,0.75,"#bf{Single lepton}")
   else:
     lumi.DrawLatex(0.4,0.75,"#bf{Dilepton}")
-  leg = ROOT.TLegend(0.4,0.6,0.55,0.73);
+  leg = ROOT.TLegend(0.4,0.52,0.55,0.71);
   leg.SetTextSize(0.03);
   leg.AddEntry(hfake,"Pre-fit background","l");
   if channel=="SL":
     leg.AddEntry(hfake_post_stat_only,"Post-fit background, StatOnly","l");
   leg.AddEntry(hfake_post,"Post-fit background","l");
 
-  uncert_legend=hfake.Clone("legend")
-  uncert_legend.SetFillColor(1)
-  uncert_legend.SetLineColor(0)
-  leg.AddEntry(uncert_legend,"Total background error","f")
+  uncert_legend_prefit=hfake.Clone("legend_prefit")
+  uncert_legend_post_fit=hfake_post.Clone("legend_postfit")
+  uncert_legend_post_fit_stat_only=hfake_post_stat_only.Clone("legend_postfit_stat_only")
+  uncert_legend_prefit.SetLineColor(0)
+  uncert_legend_post_fit.SetLineColor(0)
+  uncert_legend_post_fit_stat_only.SetLineColor(0)
+  leg.AddEntry(uncert_legend_prefit,"Statistical background uncert.","f")
+  if channel=="SL":
+    leg.AddEntry(uncert_legend_post_fit_stat_only,"Total background uncert.", "f")
+  leg.AddEntry(uncert_legend_post_fit,"Total background uncert.","f")
   leg.SetBorderSize(0)
   leg.SetFillStyle(0)
   leg.Draw()
