@@ -152,7 +152,7 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   leg.SetTextSize(0.03);
   leg.AddEntry(hfake,"Pre-fit background","l");
   if channel=="SL":
-    leg.AddEntry(hfake_post_stat_only,"Post-fit background, StatOnly","l");
+    leg.AddEntry(hfake_post_stat_only,"Post-fit background, StatOnly Fit","l");
   leg.AddEntry(hfake_post,"Post-fit background","l");
 
   uncert_legend_prefit=hfake.Clone("legend_prefit")
