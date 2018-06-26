@@ -175,11 +175,11 @@ def plot(channel,ntuplePath,ntuplePath_statOnly,variable,prefitNtuple,xvar):
   ratio1 = hfake_post.Clone("ratio")
   ratio1.SetFillStyle(0)
   if channel=="SL":
+    ratio1.SetMinimum(0.9)
+    ratio1.SetMaximum(1.1)
+  else:
     ratio1.SetMinimum(0.5)
     ratio1.SetMaximum(1.5)
-  else:
-    ratio1.SetMinimum(0)
-    ratio1.SetMaximum(2)
   ratio1.Sumw2()
   ratio1.SetStats(0)
   ratio1.Divide(hfake_post)
